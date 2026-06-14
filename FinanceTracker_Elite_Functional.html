@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FinanceTracker Elite Functional</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b1020;--card:rgba(18,24,45,.78);--text:#f8fafc;--accent:#4f46e5;--accent2:#06b6d4;--border:rgba(255,255,255,.08)}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,sans-serif;background:var(--bg);color:var(--text)}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:250px;background:rgba(8,12,24,.9);padding:20px;border-right:1px solid var(--border)}
+.main{margin-left:250px;padding:20px}
+.logo{font-size:1.6rem;font-weight:800;background:linear-gradient(90deg,#818cf8,#22d3ee);-webkit-background-clip:text;color:transparent}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.kpi{font-size:1.8rem;font-weight:800}
+input,select,button{width:100%;padding:10px;margin:4px 0;border-radius:12px;border:none}
+button{background:linear-gradient(90deg,var(--accent),var(--accent2));color:white;font-weight:700}
+table{width:100%;border-collapse:collapse} td,th{padding:8px;border-bottom:1px solid #334155}
+#chat{max-height:250px;overflow:auto}
+@media(max-width:900px){.sidebar{position:relative;width:auto}.main{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="sidebar">
+<div class="logo">💎 FinanceTracker Elite</div>
+<p>Functional Premium Edition</p>
+</div>
+
+<div class="main">
+<div class="grid">
+<div class="card"><div>Balance</div><div id="bal" class="kpi">UGX 0</div></div>
+<div class="card"><div>Income</div><div id="inc" class="kpi">UGX 0</div></div>
+<div class="card"><div>Expenses</div><div id="exp" class="kpi">UGX 0</div></div>
+<div class="card"><div>Health</div><div id="score" class="kpi">100/100</div></div>
+</div>
+
+<div class="card">
+<h3>Add Transaction</h3>
+<input id="desc" placeholder="Description">
+<input id="amt" type="number" placeholder="Amount">
+<select id="type"><option value="income">Income</option><option value="expense">Expense</option></select>
+<button onclick="addTx()">Save</button>
+</div>
+
+<div class="card">
+<h3>Analytics</h3>
+<canvas id="chart"></canvas>
+</div>
+
+<div class="card">
+<h3>🤖 AI Assistant</h3>
+<input id="q" placeholder="Ask AI">
+<button onclick="askAI()">Ask AI</button>
+<div id="chat"></div>
+</div>
+
+<div class="card">
+<table>
+<thead><tr><th>Description</th><th>Type</th><th>Amount</th><th>Action</th></tr></thead>
+<tbody id="tb"></tbody>
+</table>
+</div>
+</div>
+
+<script>
+let tx=JSON.parse(localStorage.getItem('elite_tx')||'[]');
+let chart;
+const fmt=v=>new Intl.NumberFormat('en-UG',{style:'currency',currency:'UGX',maximumFractionDigits:0}).format(v);
+
+function save(){localStorage.setItem('elite_tx',JSON.stringify(tx));}
+
+function addTx(){
+ const d=desc.value.trim(),a=parseFloat(amt.value);
+ if(!d||!a)return;
+ tx.push({id:Date.now(),d,a,t:type.value});
+ save();render();
+}
+
+function delTx(id){tx=tx.filter(x=>x.id!==id);save();render();}
+
+function render(){
+ tb.innerHTML=tx.map(x=>`<tr><td>${x.d}</td><td>${x.t}</td><td>${fmt(x.a)}</td><td><button onclick="delTx(${x.id})">Delete</button></td></tr>`).join('');
+ let incv=tx.filter(x=>x.t==='income').reduce((s,x)=>s+x.a,0);
+ let expv=tx.filter(x=>x.t==='expense').reduce((s,x)=>s+x.a,0);
+ let balv=incv-expv;
+ inc.textContent=fmt(incv); exp.textContent=fmt(expv); bal.textContent=fmt(balv);
+ score.textContent=Math.max(0,Math.min(100,Math.round((balv/(incv||1))*100)))+'/100';
+ drawChart();
+}
+
+function drawChart(){
+ const data=[tx.filter(x=>x.t==='income').reduce((a,b)=>a+b.a,0),tx.filter(x=>x.t==='expense').reduce((a,b)=>a+b.a,0)];
+ if(chart) chart.destroy();
+ chart=new Chart(document.getElementById('chart'),{type:'doughnut',data:{labels:['Income','Expense'],datasets:[{data:data}]}});
+}
+
+async function askAI(){
+ const question=q.value.trim();
+ if(!question) return;
+ chat.innerHTML += `<p><b>You:</b> ${question}</p>`;
+ try{
+ const r=await fetch('https://script.google.com/macros/s/AKfycbzx5LNNpyFeONWkPR7-mzH7ZTwzMOkLFb7laJv4MTVsdwZoJYanAXPBuDCIwE7o24sV/exec',{
+ method:'POST',
+ headers:{'Content-Type':'text/plain;charset=utf-8'},
+ body:JSON.stringify({question,transactions:JSON.stringify(tx)})
+ });
+ const data=await r.json();
+ chat.innerHTML += `<p><b>AI:</b> ${data.answer||'No response'}</p>`;
+ }catch(e){chat.innerHTML += '<p><b>AI:</b> Connection error.</p>';}
+}
+
+render();
+</script>
+</body>
+</html>
